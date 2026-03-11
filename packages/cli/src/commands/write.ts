@@ -1,5 +1,7 @@
 import { Command } from "commander";
-import { PipelineRunner } from "@inkos/core";
+import { PipelineRunner, StateManager } from "@inkos/core";
+import { readdir, unlink } from "node:fs/promises";
+import { join } from "node:path";
 import { loadConfig, createClient, findProjectRoot, log, logError } from "../utils.js";
 
 export const writeCommand = new Command("write")
@@ -51,6 +53,77 @@ writeCommand
       log("Done.");
     } catch (e) {
       logError(`Failed to write chapter: ${e}`);
+      process.exit(1);
+    }
+  });
+
+writeCommand
+  .command("rewrite")
+  .description("Re-generate a specific chapter (removes it and writes fresh)")
+  .argument("<book-id>", "Book ID")
+  .argument("<chapter>", "Chapter number to rewrite")
+  .action(async (bookId: string, chapterStr: string) => {
+    try {
+      const config = await loadConfig();
+      const client = createClient(config);
+      const root = findProjectRoot();
+      const chapterNum = parseInt(chapterStr, 10);
+
+      const state = new StateManager(root);
+      const bookDir = state.bookDir(bookId);
+      const chaptersDir = join(bookDir, "chapters");
+
+      // Remove existing chapter file
+      const files = await readdir(chaptersDir);
+      const paddedNum = String(chapterNum).padStart(4, "0");
+      const existing = files.filter((f) => f.startsWith(paddedNum) && f.endsWith(".md"));
+      for (const f of existing) {
+        await unlink(join(chaptersDir, f));
+        log(`Removed: ${f}`);
+      }
+
+      // Remove from index (and all chapters after it)
+      const index = await state.loadChapterIndex(bookId);
+      const trimmed = index.filter((ch) => ch.number < chapterNum);
+      await state.saveChapterIndex(bookId, trimmed);
+
+      // Also remove later chapter files since state will be rolled back
+      const laterFiles = files.filter((f) => {
+        const num = parseInt(f.slice(0, 4), 10);
+        return num > chapterNum && f.endsWith(".md");
+      });
+      for (const f of laterFiles) {
+        await unlink(join(chaptersDir, f));
+        log(`Removed later chapter: ${f}`);
+      }
+
+      // Restore state to previous chapter's end-state
+      if (chapterNum > 1) {
+        const restored = await state.restoreState(bookId, chapterNum - 1);
+        if (restored) {
+          log(`State restored from chapter ${chapterNum - 1} snapshot.`);
+        } else {
+          log(`Warning: no snapshot for chapter ${chapterNum - 1}. Using current state.`);
+        }
+      }
+
+      log(`Regenerating chapter ${chapterNum}...`);
+
+      const pipeline = new PipelineRunner({
+        client,
+        model: config.llm.model,
+        projectRoot: root,
+        notifyChannels: config.notify,
+      });
+
+      const result = await pipeline.writeNextChapter(bookId);
+
+      log(`  Chapter ${result.chapterNumber}: ${result.title}`);
+      log(`  Words: ${result.wordCount}`);
+      log(`  Audit: ${result.auditResult.passed ? "PASSED" : "NEEDS REVIEW"}`);
+      log(`  Status: ${result.status}`);
+    } catch (e) {
+      logError(`Failed to rewrite chapter: ${e}`);
       process.exit(1);
     }
   });

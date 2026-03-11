@@ -111,4 +111,40 @@ export class StateManager {
       "utf-8",
     );
   }
+
+  async snapshotState(bookId: string, chapterNumber: number): Promise<void> {
+    const storyDir = join(this.bookDir(bookId), "story");
+    const snapshotDir = join(storyDir, "snapshots", String(chapterNumber));
+    await mkdir(snapshotDir, { recursive: true });
+
+    const files = ["current_state.md", "particle_ledger.md", "pending_hooks.md"];
+    await Promise.all(
+      files.map(async (f) => {
+        try {
+          const content = await readFile(join(storyDir, f), "utf-8");
+          await writeFile(join(snapshotDir, f), content, "utf-8");
+        } catch {
+          // file doesn't exist yet
+        }
+      }),
+    );
+  }
+
+  async restoreState(bookId: string, chapterNumber: number): Promise<boolean> {
+    const storyDir = join(this.bookDir(bookId), "story");
+    const snapshotDir = join(storyDir, "snapshots", String(chapterNumber));
+
+    const files = ["current_state.md", "particle_ledger.md", "pending_hooks.md"];
+    try {
+      await Promise.all(
+        files.map(async (f) => {
+          const content = await readFile(join(snapshotDir, f), "utf-8");
+          await writeFile(join(storyDir, f), content, "utf-8");
+        }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }

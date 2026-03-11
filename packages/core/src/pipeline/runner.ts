@@ -173,6 +173,9 @@ export class PipelineRunner {
     };
     await this.state.saveChapterIndex(bookId, [...existingIndex, newEntry]);
 
+    // 5.5 Snapshot state for rollback support
+    await this.state.snapshotState(bookId, chapterNumber);
+
     // 6. Send notification
     if (this.config.notifyChannels && this.config.notifyChannels.length > 0) {
       const statusEmoji = auditResult.passed ? "✅" : "⚠️";
