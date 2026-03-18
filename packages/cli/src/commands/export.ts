@@ -84,7 +84,7 @@ export const exportCommand = new Command("export")
   });
 
 async function exportEpub(
-  book: { readonly title: string },
+  book: { readonly title: string; readonly language?: string },
   chapters: ReadonlyArray<{ readonly number: number; readonly wordCount: number }>,
   chaptersDir: string,
   bookId: string,
@@ -112,7 +112,7 @@ async function exportEpub(
   }
 
   const epubInstance = new EPub(
-    { title: book.title, lang: "zh-CN" },
+    { title: book.title, lang: book.language === "en" ? "en" : "zh-CN" },
     epubChapters,
   );
   const epubBuffer: Buffer = await epubInstance.genEpub();

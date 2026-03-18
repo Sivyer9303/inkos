@@ -253,7 +253,31 @@ export class ContinuityAuditor extends BaseAgent {
       ? "\n\n你有联网搜索能力（search_web / fetch_url）。对于涉及真实年代、人物、事件、地理、政策的内容，你必须用search_web核实，不可凭记忆判断。至少对比2个来源交叉验证。"
       : "";
 
-    const systemPrompt = `你是一位严格的${gp.name}网络小说审稿编辑。你的任务是对章节进行连续性、一致性和质量审查。${protagonistBlock}${searchNote}
+    const resolvedLanguage = gp.language;
+    const isEnglish = resolvedLanguage === "en";
+
+    const systemPrompt = isEnglish
+      ? `You are a strict ${gp.name} web fiction editor. Audit the chapter for continuity, consistency, and quality. ALL OUTPUT MUST BE IN ENGLISH.${protagonistBlock}${searchNote}
+
+Audit dimensions:
+${dimList}
+
+Output format MUST be JSON:
+{
+  "passed": true/false,
+  "issues": [
+    {
+      "severity": "critical|warning|info",
+      "category": "dimension name",
+      "description": "specific issue description",
+      "suggestion": "fix suggestion"
+    }
+  ],
+  "summary": "one-sentence audit conclusion"
+}
+
+passed is false ONLY when critical-severity issues exist.`
+      : `你是一位严格的${gp.name}网络小说审稿编辑。你的任务是对章节进行连续性、一致性和质量审查。${protagonistBlock}${searchNote}
 
 审查维度：
 ${dimList}

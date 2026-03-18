@@ -151,12 +151,17 @@ ${eraBlock}
 4. 伏笔前后呼应，不留悬空线
 5. 配角有独立动机，不是工具人`;
 
+    const resolvedLanguage = book.language ?? gp.language;
+    const langPrefix = resolvedLanguage === "en"
+      ? `【LANGUAGE OVERRIDE】ALL output (story_bible, volume_outline, book_rules, current_state, pending_hooks) MUST be written in English. Character names, place names, and all prose must be in English. The === SECTION: === tags remain unchanged.\n\n`
+      : "";
+    const userMessage = resolvedLanguage === "en"
+      ? `Generate the complete foundation for a ${gp.name} novel titled "${book.title}". Write everything in English.`
+      : `请为标题为"${book.title}"的${gp.name}小说生成完整基础设定。`;
+
     const response = await this.chat([
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: `请为标题为"${book.title}"的${gp.name}小说生成完整基础设定。`,
-      },
+      { role: "system", content: langPrefix + systemPrompt },
+      { role: "user", content: userMessage },
     ], { maxTokens: 16384, temperature: 0.8 });
 
     return this.parseSections(response.content);

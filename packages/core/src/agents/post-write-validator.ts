@@ -55,6 +55,13 @@ export function validatePostWrite(
 ): ReadonlyArray<PostWriteViolation> {
   const violations: PostWriteViolation[] = [];
 
+  // Skip Chinese-specific rules for English content
+  const isEnglish = genreProfile.language === "en";
+  if (isEnglish) {
+    // For English, only run book-specific prohibitions and paragraph length check
+    return validatePostWriteEnglish(content, genreProfile, bookRules);
+  }
+
   // 1. 硬性禁令: "不是…而是…" 句式
   if (/不是[^，。！？\n]{0,30}[，,]?\s*而是/.test(content)) {
     violations.push({
@@ -231,6 +238,75 @@ export function validatePostWrite(
           suggestion: "删除或改写该内容",
         });
       }
+    }
+  }
+
+  return violations;
+}
+
+/** English-specific post-write validation rules. */
+function validatePostWriteEnglish(
+  content: string,
+  genreProfile: GenreProfile,
+  bookRules: BookRules | null,
+): ReadonlyArray<PostWriteViolation> {
+  const violations: PostWriteViolation[] = [];
+
+  // 1. AI-tell word density (from en-prompt-sections IRON LAW 3)
+  const aiTellWords = ["delve", "tapestry", "testament", "intricate", "pivotal", "vibrant", "embark", "comprehensive", "nuanced"];
+  for (const word of aiTellWords) {
+    const regex = new RegExp(`\\b${word}\\b`, "gi");
+    const matches = content.match(regex);
+    if (matches && matches.length > Math.ceil(content.length / 3000)) {
+      violations.push({
+        rule: "AI-tell word density",
+        severity: "warning",
+        description: `"${word}" appears ${matches.length} times (limit: 1 per 3000 chars)`,
+        suggestion: `Replace with a more specific word`,
+      });
+    }
+  }
+
+  // 2. Paragraph overflow (same rule applies to English)
+  const paragraphs = content.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  const longParagraphs = paragraphs.filter((p) => p.length > 500);
+  if (longParagraphs.length >= 2) {
+    violations.push({
+      rule: "Paragraph length",
+      severity: "warning",
+      description: `${longParagraphs.length} paragraphs exceed 500 characters`,
+      suggestion: "Break into shorter paragraphs for readability",
+    });
+  }
+
+  // 3. Book-specific prohibitions
+  if (bookRules?.prohibitions) {
+    for (const prohibition of bookRules.prohibitions) {
+      if (prohibition.length >= 2 && prohibition.length <= 50 && content.toLowerCase().includes(prohibition.toLowerCase())) {
+        violations.push({
+          rule: "Book prohibition",
+          severity: "error",
+          description: `Found banned content: "${prohibition}"`,
+          suggestion: "Remove or rewrite this content",
+        });
+      }
+    }
+  }
+
+  // 4. Genre fatigue words
+  const fatigueWords = bookRules?.fatigueWordsOverride && bookRules.fatigueWordsOverride.length > 0
+    ? bookRules.fatigueWordsOverride
+    : genreProfile.fatigueWords;
+  for (const word of fatigueWords) {
+    const regex = new RegExp(`\\b${word}\\b`, "gi");
+    const matches = content.match(regex);
+    if (matches && matches.length > 1) {
+      violations.push({
+        rule: "Fatigue word",
+        severity: "warning",
+        description: `"${word}" appears ${matches.length} times (max 1 per chapter)`,
+        suggestion: "Vary the vocabulary",
+      });
     }
   }
 

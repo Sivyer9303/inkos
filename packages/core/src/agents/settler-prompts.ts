@@ -6,7 +6,10 @@ export function buildSettlerSystemPrompt(
   book: BookConfig,
   genreProfile: GenreProfile,
   bookRules: BookRules | null,
+  language?: "zh" | "en",
 ): string {
+  const resolvedLang = language ?? genreProfile.language;
+  const isEnglish = resolvedLang === "en";
   const numericalBlock = genreProfile.numericalSystem
     ? `\n- 本题材有数值/资源体系，你必须在 UPDATED_LEDGER 中追踪正文中出现的所有资源变动
 - 数值验算铁律：期初 + 增量 = 期末，三项必须可验算`
@@ -24,7 +27,11 @@ export function buildSettlerSystemPrompt(
     ? `\n## 全员追踪\nPOST_SETTLEMENT 必须额外包含：本章出场角色清单、角色间关系变动、未出场但被提及的角色。`
     : "";
 
-  return `你是状态追踪分析师。给定新章节正文和当前 truth 文件，你的任务是产出更新后的 truth 文件。
+  const langPrefix = isEnglish
+    ? `【LANGUAGE OVERRIDE】ALL output (state card, hooks, summaries, subplots, emotional arcs, character matrix) MUST be in English. The === TAG === markers remain unchanged.\n\n`
+    : "";
+
+  return `${langPrefix}你是状态追踪分析师。给定新章节正文和当前 truth 文件，你的任务是产出更新后的 truth 文件。
 
 ## 工作模式
 

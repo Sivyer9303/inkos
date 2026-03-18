@@ -237,6 +237,7 @@ export class WriterAgent extends BaseAgent {
   }): Promise<{ settlement: ReturnType<typeof parseSettlementOutput>; usage: TokenUsage }> {
     const settlerSystem = buildSettlerSystemPrompt(
       params.book, params.genreProfile, params.bookRules,
+      params.book.language ?? params.genreProfile.language,
     );
 
     const settlerUser = buildSettlerUserPrompt({
@@ -274,6 +275,7 @@ export class WriterAgent extends BaseAgent {
     bookDir: string,
     output: WriteChapterOutput,
     numericalSystem: boolean = true,
+    language: "zh" | "en" = "zh",
   ): Promise<void> {
     const chaptersDir = join(bookDir, "chapters");
     const storyDir = join(bookDir, "story");
@@ -282,8 +284,11 @@ export class WriterAgent extends BaseAgent {
     const paddedNum = String(output.chapterNumber).padStart(4, "0");
     const filename = `${paddedNum}_${this.sanitizeFilename(output.title)}.md`;
 
+    const heading = language === "en"
+      ? `# Chapter ${output.chapterNumber}: ${output.title}`
+      : `# 第${output.chapterNumber}章 ${output.title}`;
     const chapterContent = [
-      `# 第${output.chapterNumber}章 ${output.title}`,
+      heading,
       "",
       output.content,
     ].join("\n");

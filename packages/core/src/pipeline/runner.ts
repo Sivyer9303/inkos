@@ -273,10 +273,14 @@ export class PipelineRunner {
       const filename = `${paddedNum}_${sanitized}.md`;
       const filePath = join(chaptersDir, filename);
 
-      await writeFile(filePath, `# 第${chapterNumber}章 ${output.title}\n\n${output.content}`, "utf-8");
+      const resolvedLang = book.language ?? gp.language;
+      const heading = resolvedLang === "en"
+        ? `# Chapter ${chapterNumber}: ${output.title}`
+        : `# 第${chapterNumber}章 ${output.title}`;
+      await writeFile(filePath, `${heading}\n\n${output.content}`, "utf-8");
 
       // Save truth files
-      await writer.saveChapter(bookDir, output, gp.numericalSystem);
+      await writer.saveChapter(bookDir, output, gp.numericalSystem, resolvedLang);
       await writer.saveNewTruthFiles(bookDir, output);
 
       // Update index
@@ -655,9 +659,13 @@ export class PipelineRunner {
     const title = output.title;
     const filename = `${paddedNum}_${title.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_").slice(0, 50)}.md`;
 
+    const pipelineLang = book.language ?? gp.language;
+    const pipelineHeading = pipelineLang === "en"
+      ? `# Chapter ${chapterNumber}: ${title}`
+      : `# 第${chapterNumber}章 ${title}`;
     await writeFile(
       join(chaptersDir, filename),
-      `# 第${chapterNumber}章 ${title}\n\n${finalContent}`,
+      `${pipelineHeading}\n\n${finalContent}`,
       "utf-8",
     );
 
